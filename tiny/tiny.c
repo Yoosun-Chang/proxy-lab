@@ -123,3 +123,36 @@ void read_requesthdrs(rio_t *rp) {
   }
   return;
 }
+
+int parse_uri(char *uri, char *filename, char *cgiargs) 
+{
+  char *ptr;
+
+  /* 정적 콘텐츠 확인 */
+  if (!strstr(uri, "cgi-bin")) { // URI에 "cgi-bin" 문자열이 포함되어 있지 않은 경우
+    strcpy(cgiargs, ""); // CGI 인자를 빈 문자열로 설정
+    strcpy(filename, "."); // 파일 경로를 현재 디렉토리로 설정
+    strcat(filename, uri); // URI를 파일 경로에 추가
+    if (uri[strlen(uri)-1] == '/') { // URI의 마지막 문자가 '/'인 경우
+      strcat(filename, "home.html"); // 파일 경로에 "home.html"을 추가하여 기본 파일로 설정
+    }
+    return 1; // 정적 콘텐츠임을 나타내는 플래그 반환
+  }
+
+  /* 동적 콘텐츠 확인 */
+  else { // URI에 "cgi-bin" 문자열이 포함되어 있는 경우
+    ptr = index(uri, '?'); // URI에서 '?' 문자의 위치를 찾음
+
+    if (ptr){ // URI에 '?' 문자가 존재하는 경우
+      strcpy(cgiargs, ptr+1); // '?' 이후의 문자열을 CGI 인자로 복사
+      *ptr = '\0'; // URI 문자열에서 '?' 문자 이후의 부분을 종료하는 널 문자로 대체
+    }
+    else { // URI에 '?' 문자가 존재하지 않는 경우
+      strcpy(cgiargs, ""); // CGI 인자를 빈 문자열로 설정
+    }
+
+    strcpy(filename, "."); // 파일 경로를 현재 디렉토리로 설정
+    strcat(filename, uri); // URI를 파일 경로에 추가
+    return 0; // 동적 콘텐츠임을 나타내는 플래그 반환
+  }
+}
