@@ -156,3 +156,23 @@ int parse_uri(char *uri, char *filename, char *cgiargs)
     return 0; // 동적 콘텐츠임을 나타내는 플래그 반환
   }
 }
+
+void get_filetype(char *filename, char *filetype)
+{
+  if (strstr(filename, ".html"))
+    strcpy(filetype, "text/html");
+  else if (strstr(filename, ".gif"))
+    strcpy(filetype, "image/gif");
+  else if (strstr(filename, ".png"))
+    strcpy(filetype, "image/png");
+  else if (strstr(filename, ".jpg"))
+    strcpy(filetype, "image/jpeg");
+
+  // Homework 11.7: html5 not supporting "mpg file format"
+  else if (strstr(filename, ".mpg"))
+    strcpy(filetype, "video/mpg");
+  else if (strstr(filename, ".mp4"))
+    strcpy(filetype, "video/mp4");
+  else
+    strcpy(filetype, "text/plain");
+}
