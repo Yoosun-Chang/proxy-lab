@@ -111,3 +111,15 @@ void doit(int fd)
   }
 }
 
+void read_requesthdrs(rio_t *rp) {
+
+  char buf[MAXLINE]; // 버퍼
+  Rio_readlineb(rp, buf, MAXLINE); // 요청 라인을 읽어들여 무시한다. (요청 헤더부터 읽기 시작)
+
+  // "\r\n"이 나올 때까지 요청 헤더를 읽어들여 화면에 출력
+  while(strcmp(buf, "\r\n")){
+    Rio_readlineb(rp, buf, MAXLINE); // 한 줄을 읽는다.
+    printf("%s", buf); // 읽어들인 헤더를 화면에 출력
+  }
+  return;
+}
