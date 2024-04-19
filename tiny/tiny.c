@@ -176,3 +176,32 @@ void get_filetype(char *filename, char *filetype)
   else
     strcpy(filetype, "text/plain");
 }
+
+void serve_static(int fd, char *filename, int filesize)
+{
+  int srcfd;                // 파일 디스크립터
+  char *srcp,               // 파일 내용을 메모리에 매핑한 포인터
+       filetype[MAXLINE],   // 파일의 MIME 타입
+       buf[MAXBUF];         // 응답 헤더를 저장할 버퍼
+
+  /* 응답 헤더 생성 및 전송 */
+  get_filetype(filename, filetype);                         // 파일 타입 결정
+  sprintf(buf, "HTTP/1.0 200 OK\r\n");                      // 응답 라인 작성
+  // 응답 헤더
+  sprintf(buf, "%sServer: Tiny Web Server\r\n", buf);       // 서버 정보 추가
+  sprintf(buf, "%sConnections: close\r\n", buf);            // 연결 종료 정보 추가
+  sprintf(buf, "%sContent-length: %d\r\n", buf, filesize);  // 컨텐츠 길이 추가
+  sprintf(buf, "%sContent-type: %s\r\n\r\n", buf, filetype); // 컨텐츠 타입 추가
+
+  /* 응답 라인과 헤더를 클라이언트에게 보냄 */
+  Rio_writen(fd, buf, strlen(buf)); 
+  printf("Response headers: \n");
+  printf("%s", buf);
+
+  /* 응답 바디 전송 */
+  srcfd = Open(filename, O_RDONLY, 0);                       // 파일 열기
+  srcp = Mmap(0, filesize, PROT_READ, MAP_PRIVATE, srcfd, 0); // 파일을 메모리에 동적할당
+  Close(srcfd);                                              // 파일 닫기
+  Rio_writen(fd, srcp, filesize);                           // 클라이언트에게 파일 내용 전송
+  Munmap(srcp, filesize);                                   // 메모리 할당 해제
+}
