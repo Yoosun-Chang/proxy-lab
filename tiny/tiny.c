@@ -205,3 +205,24 @@ void serve_static(int fd, char *filename, int filesize)
   Rio_writen(fd, srcp, filesize);                           // 클라이언트에게 파일 내용 전송
   Munmap(srcp, filesize);                                   // 메모리 할당 해제
 }
+
+void serve_dynamic(int fd, char *filename, char *cgiargs)
+{ 
+  char buf[MAXLINE], *emptylist[] = {NULL};
+
+  /* 클라이언트에 HTTP 응답 라인과 헤더를 전송 */
+  sprintf(buf, "HTTP/1.1 200 OK\r\n"); // HTTP 응답 라인 생성
+  Rio_writen(fd, buf, strlen(buf)); // 클라이언트에 응답 라인 전송
+  sprintf(buf, "Server: Tiny Web Server\r\n"); // 서버 정보를 응답 헤더에 추가
+  Rio_writen(fd, buf, strlen(buf)); // 클라이언트에 응답 헤더 전송
+
+	/* CGI 실행을 위해 자식 프로세스를 생성 */
+  if (Fork() == 0) // fork() 자식 프로세스 생성됐으면 0을 반환 (성공)
+  { 
+    setenv("QUERY_STRING", cgiargs, 1); // CGI 프로그램에 필요한 환경 변수 설정
+    Dup2(fd, STDOUT_FILENO); // 자식 프로세스의 표준 출력을 클라이언트로 리다이렉션
+    Execve(filename, emptylist, environ); // CGI 프로그램 실행
+  }
+
+  Wait(NULL); // 부모 프로세스가 자식 프로세스의 종료를 대기
+}
