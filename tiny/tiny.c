@@ -11,9 +11,9 @@
 void doit(int fd);
 void read_requesthdrs(rio_t *rp);
 int parse_uri(char *uri, char *filename, char *cgiargs);
-void serve_static(int fd, char *filename, int filesize, char *method);
+void serve_static(int fd, char *filename, int filesize);
 void get_filetype(char *filename, char *filetype);
-void serve_dynamic(int fd, char *filename, char *cgiargs, char *method);
+void serve_dynamic(int fd, char *filename, char *cgiargs);
 void clienterror(int fd, char *cause, char *errnum, char *shortmsg,
                  char *longmsg);
 
@@ -62,8 +62,7 @@ void doit(int fd)
 	// version: "HTTP/1.1"
 
   /* HTTP 요청의 메서드가 "GET"이 아닌 경우에 501 오류를 클라이언트에게 반환 */
-  /* Homework 11.11 "HEAD"가 아닌 경우 추가 */
-  if (strcasecmp(method, "GET") * strcasecmp(method, "HEAD"))
+  if (strcasecmp(method, "GET"))
   { // 조건문에서 하나라도 0이면 0
     clienterror(fd, method, "501", "Not implemented", "Tiny does not implement this method");
     return;
@@ -94,7 +93,7 @@ void doit(int fd)
       return;
     }
     // 정적 서버에 파일의 사이즈를 같이 보낸다. => Response header에 Content-length 위해
-    serve_static(fd, filename, sbuf.st_size, method);
+    serve_static(fd, filename, sbuf.st_size);
   }
 
   /* 동적 컨텐츠 */
@@ -108,7 +107,7 @@ void doit(int fd)
     }
     // 동적 서버에 인자를 같이 보낸다.
     // filename은 CGI 프로그램의 경로이고, cgiargs는 CGI 프로그램을 실행할 때 필요한 인자들을 포함
-    serve_dynamic(fd, filename, cgiargs, method);
+    serve_dynamic(fd, filename, cgiargs);
   }
 }
 
@@ -169,16 +168,11 @@ void get_filetype(char *filename, char *filetype)
   else if (strstr(filename, ".jpg"))
     strcpy(filetype, "image/jpeg");
 
-  // Homework 11.7: MP4 비디오 타입 추가
-  else if (strstr(filename, ".mpg"))
-    strcpy(filetype, "video/mpg");
-  else if (strstr(filename, ".mp4"))
-    strcpy(filetype, "video/mp4");
   else
     strcpy(filetype, "text/plain");
 }
 
-void serve_static(int fd, char *filename, int filesize, char *method)
+void serve_static(int fd, char *filename, int filesize)
 {
   int srcfd;                // 파일 디스크립터
   char *srcp,               // 파일 내용을 메모리에 매핑한 포인터
@@ -199,24 +193,15 @@ void serve_static(int fd, char *filename, int filesize, char *method)
   printf("Response headers: \n");
   printf("%s", buf);
 
-  if (strcasecmp(method, "HEAD") == 0)
-      return;
-
   /* 응답 바디 전송 */
   srcfd = Open(filename, O_RDONLY, 0);                       // 파일 열기
-  //srcp = Mmap(0, filesize, PROT_READ, MAP_PRIVATE, srcfd, 0); // 파일을 메모리에 동적할당
-
-  /* Homework 11.9 */
-  srcp = (char *) malloc(filesize); // mmap 대신 malloc 사용
-  rio_readn(srcfd, srcp, filesize); // rio_readn 사용하기
-
-  Close(srcfd);                                             // 파일 닫기
+  srcp = Mmap(0, filesize, PROT_READ, MAP_PRIVATE, srcfd, 0); // 파일을 메모리에 동적할당
+  Close(srcfd);                                              // 파일 닫기
   Rio_writen(fd, srcp, filesize);                           // 클라이언트에게 파일 내용 전송
-  // Munmap(srcp, filesize);                                // 메모리 할당 해제
-  free(srcp);                                               // malloc 사용 => munmap에서 free로 변경  
+  Munmap(srcp, filesize);                                   // 메모리 할당 해제
 }
 
-void serve_dynamic(int fd, char *filename, char *cgiargs, char *method)
+void serve_dynamic(int fd, char *filename, char *cgiargs)
 { 
   char buf[MAXLINE], *emptylist[] = {NULL};
 
