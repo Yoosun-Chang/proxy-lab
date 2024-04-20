@@ -11,9 +11,9 @@
 void doit(int fd);
 void read_requesthdrs(rio_t *rp);
 int parse_uri(char *uri, char *filename, char *cgiargs);
-void serve_static(int fd, char *filename, int filesize);
+void serve_static(int fd, char *filename, int filesize, char *method);
 void get_filetype(char *filename, char *filetype);
-void serve_dynamic(int fd, char *filename, char *cgiargs);
+void serve_dynamic(int fd, char *filename, char *cgiargs, char *method);
 void clienterror(int fd, char *cause, char *errnum, char *shortmsg,
                  char *longmsg);
 
@@ -94,7 +94,7 @@ void doit(int fd)
       return;
     }
     // 정적 서버에 파일의 사이즈를 같이 보낸다. => Response header에 Content-length 위해
-    serve_static(fd, filename, sbuf.st_size);
+    serve_static(fd, filename, sbuf.st_size, method);
   }
 
   /* 동적 컨텐츠 */
@@ -108,7 +108,7 @@ void doit(int fd)
     }
     // 동적 서버에 인자를 같이 보낸다.
     // filename은 CGI 프로그램의 경로이고, cgiargs는 CGI 프로그램을 실행할 때 필요한 인자들을 포함
-    serve_dynamic(fd, filename, cgiargs);
+    serve_dynamic(fd, filename, cgiargs, method);
   }
 }
 
@@ -178,7 +178,7 @@ void get_filetype(char *filename, char *filetype)
     strcpy(filetype, "text/plain");
 }
 
-void serve_static(int fd, char *filename, int filesize)
+void serve_static(int fd, char *filename, int filesize, char *method)
 {
   int srcfd;                // 파일 디스크립터
   char *srcp,               // 파일 내용을 메모리에 매핑한 포인터
@@ -199,6 +199,9 @@ void serve_static(int fd, char *filename, int filesize)
   printf("Response headers: \n");
   printf("%s", buf);
 
+  if (strcasecmp(method, "HEAD") == 0)
+      return;
+
   /* 응답 바디 전송 */
   srcfd = Open(filename, O_RDONLY, 0);                       // 파일 열기
   //srcp = Mmap(0, filesize, PROT_READ, MAP_PRIVATE, srcfd, 0); // 파일을 메모리에 동적할당
@@ -213,7 +216,7 @@ void serve_static(int fd, char *filename, int filesize)
   free(srcp);                                               // malloc 사용 => munmap에서 free로 변경  
 }
 
-void serve_dynamic(int fd, char *filename, char *cgiargs)
+void serve_dynamic(int fd, char *filename, char *cgiargs, char *method)
 { 
   char buf[MAXLINE], *emptylist[] = {NULL};
 
