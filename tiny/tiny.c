@@ -61,7 +61,8 @@ void doit(int fd)
 	// uri: "/index.html"
 	// version: "HTTP/1.1"
 
-  /* HTTP 요청의 메서드가 "GET" 또는 "HEAD"가 아닌 경우에 501 오류를 클라이언트에게 반환 */
+  /* HTTP 요청의 메서드가 "GET"이 아닌 경우에 501 오류를 클라이언트에게 반환 */
+  /* Homework 11.11 "HEAD"가 아닌 경우 추가 */
   if (strcasecmp(method, "GET") * strcasecmp(method, "HEAD"))
   { // 조건문에서 하나라도 0이면 0
     clienterror(fd, method, "501", "Not implemented", "Tiny does not implement this method");
