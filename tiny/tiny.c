@@ -202,13 +202,14 @@ void serve_static(int fd, char *filename, int filesize)
   srcfd = Open(filename, O_RDONLY, 0);                       // 파일 열기
   //srcp = Mmap(0, filesize, PROT_READ, MAP_PRIVATE, srcfd, 0); // 파일을 메모리에 동적할당
 
-  // Homework 11.9
+  /* Homework 11.9 */
   srcp = (char *) malloc(filesize); // mmap 대신 malloc 사용
   rio_readn(srcfd, srcp, filesize); // rio_readn 사용하기
 
   Close(srcfd);                                             // 파일 닫기
   Rio_writen(fd, srcp, filesize);                           // 클라이언트에게 파일 내용 전송
-  Munmap(srcp, filesize);                                   // 메모리 할당 해제
+  // Munmap(srcp, filesize);                                // 메모리 할당 해제
+  free(srcp);                                               // malloc 사용 => munmap에서 free로 변경  
 }
 
 void serve_dynamic(int fd, char *filename, char *cgiargs)
