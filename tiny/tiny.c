@@ -168,7 +168,7 @@ void get_filetype(char *filename, char *filetype)
   else if (strstr(filename, ".jpg"))
     strcpy(filetype, "image/jpeg");
 
-  // Homework 11.7: html5 not supporting "mpg file format"
+  // Homework 11.7: MP4 비디오 타입 추가
   else if (strstr(filename, ".mpg"))
     strcpy(filetype, "video/mpg");
   else if (strstr(filename, ".mp4"))
