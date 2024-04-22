@@ -6,6 +6,7 @@
 #define MAX_OBJECT_SIZE 102400 // 최대 객체 크기
 
 void doit(int fd);
+void parse_uri(char *uri, char *hostname, char *pathname, char *port);
 
 /* You won't lose style points for including this long line in your code */
 static const char *user_agent_hdr =
@@ -38,7 +39,7 @@ int main(int argc, char **argv) {
   }
 }
 
-// 프록시 서버의 핵심 동작을 담당하는 함수
+/* 프록시 서버의 핵심 동작을 담당하는 함수 */
 void doit(int fd)
 {
   char buf[MAXLINE], method[MAXLINE], uri[MAXLINE], version[MAXLINE]; // 버퍼 및 요청 라인 구성 요소
@@ -90,5 +91,16 @@ void doit(int fd)
   // 연결 종료
   Close(serverfd);
 
+}
+
+/* 주어진 URI를 호스트명, 포트, 경로로 파싱하는 함수 */
+void parse_uri(char *uri, char *hostname, char *pathname, char *port) {
+    char *ptr;
+    ptr = strstr(uri, "://"); // URI에서 "://" 문자열을 찾음
+    if (ptr != NULL) { // "://" 문자열을 찾았을 경우
+        sscanf(ptr+3, "%[^:/]:%[^/]%s", hostname, port, pathname); // 호스트명, 포트, 경로를 추출하여 변수에 저장
+    } else { // "://" 문자열을 찾지 못한 경우
+        sscanf(uri, "%[^:/]:%[^/]%s", hostname, port, pathname); // URI 전체를 호스트명, 포트, 경로로 간주하여 추출
+    }
 }
 
