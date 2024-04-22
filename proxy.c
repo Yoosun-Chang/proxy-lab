@@ -79,6 +79,9 @@ void doit(int clientfd) {
 
     /* 요청 메소드, URI 읽기 */
     sscanf(request_buf, "%s %s", method, uri); // 요청 라인에서 메소드와 URI를 추출
+    
+    if (!strcasecmp(uri, "/favicon.ico")) // favicon 에러
+      return;
 
     /* URI 파싱하여 호스트명, 포트, 경로 추출 */
     parse_uri(uri, hostname, port, path); // URI에서 호스트명, 포트, 경로를 파싱하여 변수에 저장
