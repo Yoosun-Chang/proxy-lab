@@ -7,6 +7,8 @@
 
 void doit(int fd);
 void parse_uri(char *uri, char *hostname, char *pathname, char *port);
+void clienterror(int fd, char *cause, char *errnum, char *shortmsg, char *longmsg);
+void read_requesthdrs(rio_t *rp);
 
 /* You won't lose style points for including this long line in your code */
 static const char *user_agent_hdr =
@@ -123,4 +125,17 @@ void clienterror(int fd, char *cause, char *errnum, char *shortmsg, char *longms
     sprintf(buf, "Content-length: %lu\r\n\r\n", strlen(body)); // HTML 본문의 길이 설정
     Rio_writen(fd, buf, strlen(buf)); // 클라이언트에게 전송
     Rio_writen(fd, body, strlen(body)); // HTML 본문을 클라이언트에게 전송
+}
+
+/* 클라이언트로부터의 HTTP 요청 헤더를 읽어들이는 함수 */
+void read_requesthdrs(rio_t *rp) {
+    char buf[MAXLINE];
+
+    // HTTP 헤더를 읽어들임
+    Rio_readlineb(rp, buf, MAXLINE);
+    while(strcmp(buf, "\r\n")) { // 빈 줄이 나올 때까지 반복
+        Rio_readlineb(rp, buf, MAXLINE);
+        printf("%s", buf); // 헤더를 화면에 출력하거나 다른 작업을 수행할 수 있음
+    }
+    return;
 }
