@@ -9,6 +9,7 @@ void doit(int fd);
 void parse_uri(char *uri, char *hostname, char *pathname, char *port);
 void clienterror(int fd, char *cause, char *errnum, char *shortmsg, char *longmsg);
 void read_requesthdrs(rio_t *rp);
+void *thread_func(void *arg);
 
 /* You won't lose style points for including this long line in your code */
 static const char *user_agent_hdr =
@@ -16,29 +17,49 @@ static const char *user_agent_hdr =
     "Firefox/10.0.3\r\n";
 
 int main(int argc, char **argv) {
-  int listenfd, clientfd; // 서버 및 클라이언트 소켓 파일 디스크립터
-  char hostname[MAXLINE], port[MAXLINE]; // 클라이언트 호스트네임 및 포트번호
-  socklen_t clientlen; // 클라이언트 주소 구조체 크기
-  struct sockaddr_storage clientaddr; // 클라이언트 주소 구조체
+    int listenfd, clientfd;
+    char hostname[MAXLINE], port[MAXLINE];
+    socklen_t clientlen;
+    struct sockaddr_storage clientaddr;
+    pthread_t tid; // Thread ID variable
 
-  // 명령행 인수 확인
-  if (argc != 2) { // 인수 개수가 2가 아니면 오류 메시지 출력
-    fprintf(stderr, "usage: %s <port>\n", argv[0]);
-    exit(1);
-  }
+    // Check command line arguments
+    if (argc != 2) {
+        fprintf(stderr, "usage: %s <port>\n", argv[0]);
+        exit(1);
+    }
 
-  // 클라이언트 연결 수신 소켓 생성
-  listenfd = Open_listenfd(argv[1]);
+    // Create a listening socket
+    listenfd = Open_listenfd(argv[1]);
 
-  // 클라이언트 요청 수락 및 처리
-  while (1) {
-    clientlen = sizeof(clientaddr); // 클라이언트 주소 구조체 크기 설정
-    clientfd = Accept(listenfd, (SA *)&clientaddr, &clientlen); // 연결 수락
-    Getnameinfo((SA *)&clientaddr, clientlen, hostname, MAXLINE, port, MAXLINE, 0); // 클라이언트 호스트네임 및 포트번호 추출
-    printf("Accepted connection from (%s, %s)\n", hostname, port); // 연결 확인 메시지 출력
-    doit(clientfd); // 클라이언트 요청 처리 함수 호출
-    Close(clientfd); // 연결 종료 및 소켓 닫음
-  }
+    // Infinite loop to accept incoming connections and spawn threads
+    while (1) {
+        clientlen = sizeof(clientaddr);
+        clientfd = Accept(listenfd, (SA *)&clientaddr, &clientlen);
+        Getnameinfo((SA *)&clientaddr, clientlen, hostname, MAXLINE, port, MAXLINE, 0);
+        printf("Accepted connection from (%s, %s)\n", hostname, port);
+
+        // Create a thread to handle the connection
+        pthread_create(&tid, NULL, thread_func, (void *)&clientfd);
+
+        // Detach the thread to avoid memory leaks
+        pthread_detach(tid);
+    }
+    return 0; // This line won't be reached, but included for completeness
+}
+
+// Thread function to handle each connection
+void *thread_func(void *arg) {
+    int clientfd = *((int *)arg);
+
+    // Call your existing `doit` function to handle the connection
+    doit(clientfd);
+
+    // Close the client socket
+    Close(clientfd);
+
+    // Exit the thread
+    pthread_exit(NULL);
 }
 
 /* 프록시 서버의 핵심 동작을 담당하는 함수 */
