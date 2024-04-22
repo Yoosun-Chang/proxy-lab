@@ -95,15 +95,31 @@ void doit(int clientfd) {
 
 
 /* 주어진 URI를 호스트명, 포트, 경로로 파싱하는 함수 */
-void parse_uri(char *uri, char *hostname, char *pathname, char *port) {
-    char *ptr;
-    ptr = strstr(uri, "://"); // URI에서 "://" 문자열을 찾음
-    if (ptr != NULL) { // "://" 문자열을 찾았을 경우
-        sscanf(ptr+3, "%[^:/]:%[^/]%s", hostname, port, pathname); // 호스트명, 포트, 경로를 추출하여 변수에 저장
-    } else { // "://" 문자열을 찾지 못한 경우
-        sscanf(uri, "%[^:/]:%[^/]%s", hostname, port, pathname); // URI 전체를 호스트명, 포트, 경로로 간주하여 추출
+// URI 문자열을 호스트명, 포트, 경로로 파싱하는 함수
+void parse_uri(char *uri, char *hostname, char *port, char *path) {
+    printf("---parse_uri: %s\n", uri); // 디버깅용 메시지 출력
+    // 호스트명을 가리키는 포인터 설정
+    char *hostname_ptr = strstr(uri, "//") != NULL ? strstr(uri, "//") + 2 : uri + 1;
+    // 포트를 가리키는 포인터 설정
+    char *port_ptr = strstr(hostname_ptr, ":");
+    // 경로를 가리키는 포인터 설정
+    char *path_ptr = strstr(hostname_ptr, "/");
+    
+    // 경로가 존재한다면
+    if (path_ptr > 0) {
+        *path_ptr = '\0'; // 경로 부분을 끝낼 문자('\0')로 대체
+        strcpy(path, path_ptr+1); // 경로를 path 버퍼에 복사
     }
+    // 포트가 존재한다면
+    if (port_ptr > 0) {
+        *port_ptr = '\0'; // 포트 부분을 끝낼 문자('\0')로 대체
+        strcpy(port, port_ptr + 1); // 포트를 port 버퍼에 복사
+    }
+
+    strcpy(hostname, hostname_ptr); // 호스트명을 hostname 버퍼에 복사
+    printf("---parse_uri host: %s, port: %s, path: %s\n", hostname, port, path); // 호스트명, 포트, 경로를 출력
 }
+
 
 /* 클라이언트에게 에러 메시지를 전송하는 함수 */
 void clienterror(int fd, char *cause, char *errnum, char *shortmsg, char *longmsg) {
