@@ -42,58 +42,57 @@ int main(int argc, char **argv) {
 }
 
 /* 프록시 서버의 핵심 동작을 담당하는 함수 */
-void doit(int fd)
-{
-  char buf[MAXLINE], method[MAXLINE], uri[MAXLINE], version[MAXLINE]; // 버퍼 및 요청 라인 구성 요소
-  rio_t rio_client, rio_server;
+// 클라이언트로부터 요청을 받아들여 처리하고, 원격 서버에 전달하여 응답을 받아 클라이언트에게 다시 전송하는 함수
+void doit(int clientfd) {
+    int serverfd; // 서버 소켓 디스크립터
+    char request_buf[MAXLINE], response_buf[MAX_OBJECT_SIZE]; // 요청과 응답을 저장할 버퍼
+    char method[MAXLINE], uri[MAXLINE], path[MAXLINE]; // 요청 메소드, URI, 경로
+    char hostname[MAXLINE], port[MAXLINE]; // 호스트명, 포트
+    rio_t request_rio, response_rio; // 클라이언트로부터의 요청과 서버로부터의 응답을 처리하기 위한 리오 버퍼
 
-  /* 클라이언트가 보낸 요청 라인 분석 */
-  Rio_readinitb(&rio_client, fd); // 클라이언트 소켓 디스크립터를 리오 버퍼에 연결
-  Rio_readlineb(&rio_client, buf, MAXLINE); // 클라이언트로부터 요청 라인 읽기
-  sscanf(buf, "%s %s %s", method, uri, version); // 요청 라인을 메소드, URI, 버전으로 파싱
-  // GET /index.html HTTP/1.1
-  // method: "GET"
-	// uri: "/index.html"
-	// version: "HTTP/1.1"
+    /* 클라이언트의 요청 읽기 */
+    Rio_readinitb(&request_rio, clientfd); // 클라이언트 소켓 디스크립터를 리오 버퍼에 연결
+    Rio_readlineb(&request_rio, request_buf, MAXLINE); // 클라이언트로부터 요청 라인을 읽음
+    printf("Request header: %s\n", request_buf); // 디버깅용 요청 헤더 출력
 
-  /* HTTP 요청의 메서드가 "GET"이 아닌 경우에 501 오류를 클라이언트에게 반환 */
-  if (strcasecmp(method, "GET"))
-  { // 조건문에서 하나라도 0이면 0
-    clienterror(fd, method, "501", "Not Implemented", "Proxy does not implement this method");
-    return;
-  }
-  
-  // 서버 호스트명과 포트를 추출
-  char hostname[MAXLINE], pathname[MAXLINE], port[MAXLINE];
-  parse_uri(uri, hostname, pathname, port);
+    /* 요청 메소드, URI 읽기 */
+    sscanf(request_buf, "%s %s", method, uri); // 요청 라인에서 메소드와 URI를 추출
 
-  // 서버로 연결
-  int serverfd = Open_clientfd(hostname, port);
+    /* URI 파싱하여 호스트명, 포트, 경로 추출 */
+    parse_uri(uri, hostname, port, path); // URI에서 호스트명, 포트, 경로를 파싱하여 변수에 저장
 
-  if (serverfd < 0) { // 파일이 없다면 -1, 404에러
-    clienterror(fd, hostname, "404", "Not found", "Proxy couldn't connect to the server");
-    return;
-  }
+    printf("uri: %s\n", uri); // 디버깅용 URI 출력
 
-  // 서버에 HTTP 요청 전송
-  Rio_readinitb(&rio_server, serverfd); // 서버 소켓 디스크립터를 리오 버퍼에 연결
-  Rio_writen(serverfd, buf, strlen(buf)); // 요청 라인을 서버에 전송
-  
-  // 요청 헤더와 본문을 서버로 전송
-  while (Rio_readlineb(&rio_client, buf, MAXLINE) > 0) {  // 클라이언트로부터 헤더 읽기
-      if (strcmp(buf, "\r\n") == 0) break; // 헤더 끝 확인
-      Rio_writen(serverfd, buf, strlen(buf)); // 헤더를 서버에 전송
-  }
+    /* 요청 수정: 새로운 요청 구성 */
+    sprintf(request_buf, "%s /%s %s\r\n", method, path, "HTTP/1.0"); // 요청 라인 재구성
+    printf("%s\n", request_buf); // 재구성된 요청 헤더 출력
+    sprintf(request_buf, "%sConnection: close\r\n", request_buf); // Connection 헤더 추가
+    sprintf(request_buf, "%sProxy-Connection: close\r\n", request_buf); // Proxy-Connection 헤더 추가
+    sprintf(request_buf, "%s%s\r\n", request_buf, user_agent_hdr); // User-Agent 헤더 추가
 
-  // 서버로부터 응답을 받아 클라이언트에 전송
-  while (Rio_readlineb(&rio_server, buf, MAXLINE) > 0) { // 서버로부터 응답 읽기
-      Rio_writen(fd, buf, strlen(buf)); // 응답을 클라이언트에 전송
-  }
+    /* 요청 메소드가 GET 또는 HEAD가 아닌 경우 오류 응답 전송 */
+    if (strcasecmp(method, "GET") && strcasecmp(method, "HEAD")) {
+        clienterror(clientfd, method, "501", "Not Implemented", "Proxy does not implement this method");
+        return;
+    }
 
-  // 연결 종료
-  Close(serverfd);
+    /* 원격 서버에 클라이언트의 요청 전송 */
+    serverfd = Open_clientfd(hostname, port); // 서버로의 연결 생성
+    if (serverfd < 0) { // 연결 실패 시
+        clienterror(clientfd, hostname, "404", "Not found", "Proxy couldn't connect to the server"); // 클라이언트에게 오류 응답 전송
+        return;
+    }
+    printf("%s\n", request_buf); // 전송할 요청 헤더 출력
+    Rio_writen(serverfd, request_buf, strlen(request_buf)); // 서버에 요청 전송
 
+    /* 서버로부터 응답 받아 클라이언트에 전송 */
+    ssize_t n;
+    n = Rio_readn(serverfd, response_buf, MAX_OBJECT_SIZE); // 서버로부터 응답을 읽음
+    Rio_writen(clientfd, response_buf, n); // 클라이언트에게 응답을 전송
+
+    Close(serverfd); // 서버 연결 종료
 }
+
 
 /* 주어진 URI를 호스트명, 포트, 경로로 파싱하는 함수 */
 void parse_uri(char *uri, char *hostname, char *pathname, char *port) {
