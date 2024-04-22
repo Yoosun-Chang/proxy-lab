@@ -95,7 +95,6 @@ void doit(int clientfd) {
 
 
 /* 주어진 URI를 호스트명, 포트, 경로로 파싱하는 함수 */
-// URI 문자열을 호스트명, 포트, 경로로 파싱하는 함수
 void parse_uri(char *uri, char *hostname, char *port, char *path) {
     printf("---parse_uri: %s\n", uri); // 디버깅용 메시지 출력
     // 호스트명을 가리키는 포인터 설정
