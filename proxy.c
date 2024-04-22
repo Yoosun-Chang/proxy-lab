@@ -17,49 +17,48 @@ static const char *user_agent_hdr =
     "Firefox/10.0.3\r\n";
 
 int main(int argc, char **argv) {
-    int listenfd, clientfd;
-    char hostname[MAXLINE], port[MAXLINE];
-    socklen_t clientlen;
-    struct sockaddr_storage clientaddr;
-    pthread_t tid; // Thread ID variable
+  int listenfd, clientfd; // 서버 및 클라이언트 소켓 파일 디스크립터
+  char hostname[MAXLINE], port[MAXLINE]; // 클라이언트 호스트네임 및 포트번호
+  socklen_t clientlen; // 클라이언트 주소 구조체 크기
+  struct sockaddr_storage clientaddr; // 클라이언트 주소 구조체
+  pthread_t tid; // 스레드 ID를 저장할 변수
 
-    // Check command line arguments
-    if (argc != 2) {
-        fprintf(stderr, "usage: %s <port>\n", argv[0]);
-        exit(1);
-    }
+  // 명령행 인수 확인
+  if (argc != 2) { // 인수 개수가 2가 아니면 오류 메시지 출력
+    fprintf(stderr, "usage: %s <port>\n", argv[0]);
+    exit(1);
+  }
 
-    // Create a listening socket
-    listenfd = Open_listenfd(argv[1]);
+  // 클라이언트 연결 수신 소켓 생성
+  listenfd = Open_listenfd(argv[1]);
 
-    // Infinite loop to accept incoming connections and spawn threads
-    while (1) {
-        clientlen = sizeof(clientaddr);
-        clientfd = Accept(listenfd, (SA *)&clientaddr, &clientlen);
-        Getnameinfo((SA *)&clientaddr, clientlen, hostname, MAXLINE, port, MAXLINE, 0);
-        printf("Accepted connection from (%s, %s)\n", hostname, port);
+  // 클라이언트 요청 수락 및 처리
+  while (1) {
+    clientlen = sizeof(clientaddr); // 클라이언트 주소 구조체 크기 설정
+    clientfd = Accept(listenfd, (SA *)&clientaddr, &clientlen); // 연결 수락
+    Getnameinfo((SA *)&clientaddr, clientlen, hostname, MAXLINE, port, MAXLINE, 0); // 클라이언트 호스트네임 및 포트번호 추출
+    printf("Accepted connection from (%s, %s)\n", hostname, port); // 연결 확인 메시지 출력
+    
+    // 클라이언트 연결을 처리할 새로운 스레드 생성
+    pthread_create(&tid, NULL, thread_func, (void *)&clientfd);
 
-        // Create a thread to handle the connection
-        pthread_create(&tid, NULL, thread_func, (void *)&clientfd);
-
-        // Detach the thread to avoid memory leaks
-        pthread_detach(tid);
-    }
-    return 0; // This line won't be reached, but included for completeness
+    // 스레드를 따로 분리하여 메모리 누수를 방지하기
+    pthread_detach(tid);
+  }
 }
 
-// Thread function to handle each connection
+/* 각 연결을 처리할 스레드 함수 */
 void *thread_func(void *arg) {
-    int clientfd = *((int *)arg);
+  int clientfd = *((int *)arg); // 클라이언트 소켓 파일 디스크립터를 인수로부터 얻음
 
-    // Call your existing `doit` function to handle the connection
-    doit(clientfd);
+  // 기존의 `doit` 함수를 호출하여 클라이언트 요청 처리
+  doit(clientfd);
 
-    // Close the client socket
-    Close(clientfd);
+  // 클라이언트 소켓 닫음
+  Close(clientfd);
 
-    // Exit the thread
-    pthread_exit(NULL);
+  // 스레드 종료
+  pthread_exit(NULL);
 }
 
 /* 프록시 서버의 핵심 동작을 담당하는 함수 */
