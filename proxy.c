@@ -17,7 +17,8 @@ static const char *user_agent_hdr =
     "Firefox/10.0.3\r\n";
 
 int main(int argc, char **argv) {
-  int listenfd, clientfd; // 서버 및 클라이언트 소켓 파일 디스크립터
+  int listenfd;
+  int *clientfd; // 서버 및 클라이언트 소켓 파일 디스크립터
   char hostname[MAXLINE], port[MAXLINE]; // 클라이언트 호스트네임 및 포트번호
   socklen_t clientlen; // 클라이언트 주소 구조체 크기
   struct sockaddr_storage clientaddr; // 클라이언트 주소 구조체
@@ -35,12 +36,13 @@ int main(int argc, char **argv) {
   // 클라이언트 요청 수락 및 처리
   while (1) {
     clientlen = sizeof(clientaddr); // 클라이언트 주소 구조체 크기 설정
-    clientfd = Accept(listenfd, (SA *)&clientaddr, &clientlen); // 연결 수락
+    clientfd = Malloc(sizeof(int));
+    *clientfd = Accept(listenfd, (SA *)&clientaddr, &clientlen); // 연결 수락
     Getnameinfo((SA *)&clientaddr, clientlen, hostname, MAXLINE, port, MAXLINE, 0); // 클라이언트 호스트네임 및 포트번호 추출
     printf("Accepted connection from (%s, %s)\n", hostname, port); // 연결 확인 메시지 출력
     
     // 클라이언트 연결을 처리할 새로운 스레드 생성
-    pthread_create(&tid, NULL, thread_func, (void *)&clientfd);
+    pthread_create(&tid, NULL, thread_func, clientfd);
 
     // 스레드를 따로 분리하여 메모리 누수를 방지하기
     pthread_detach(tid);
@@ -50,7 +52,7 @@ int main(int argc, char **argv) {
 /* 각 연결을 처리할 스레드 함수 */
 void *thread_func(void *arg) {
   int clientfd = *((int *)arg); // 클라이언트 소켓 파일 디스크립터를 인수로부터 얻음
-
+  free(arg);
   // 기존의 `doit` 함수를 호출하여 클라이언트 요청 처리
   doit(clientfd);
 
