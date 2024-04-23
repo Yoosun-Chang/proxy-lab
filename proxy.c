@@ -9,7 +9,7 @@ void doit(int fd);
 void parse_uri(char *uri, char *hostname, char *pathname, char *port);
 void clienterror(int fd, char *cause, char *errnum, char *shortmsg, char *longmsg);
 void read_requesthdrs(rio_t *rp);
-void *thread_func(void *arg);
+void *thread(void *vargp);
 
 /* You won't lose style points for including this long line in your code */
 static const char *user_agent_hdr =
@@ -34,33 +34,24 @@ int main(int argc, char **argv) {
   listenfd = Open_listenfd(argv[1]);
 
   // 클라이언트 요청 수락 및 처리
-  while (1) {
-    clientlen = sizeof(clientaddr); // 클라이언트 주소 구조체 크기 설정
-    clientfd = Malloc(sizeof(int));
-    *clientfd = Accept(listenfd, (SA *)&clientaddr, &clientlen); // 연결 수락
-    Getnameinfo((SA *)&clientaddr, clientlen, hostname, MAXLINE, port, MAXLINE, 0); // 클라이언트 호스트네임 및 포트번호 추출
-    printf("Accepted connection from (%s, %s)\n", hostname, port); // 연결 확인 메시지 출력
-    
-    // 클라이언트 연결을 처리할 새로운 스레드 생성
-    pthread_create(&tid, NULL, thread_func, clientfd);
-
-    // 스레드를 따로 분리하여 메모리 누수를 방지하기
-    pthread_detach(tid);
-  }
+    while (1) {
+        clientlen = sizeof(clientaddr);
+        clientfd = Malloc(sizeof(int));
+        *clientfd = Accept(listenfd, (SA * ) & clientaddr, &clientlen); // 클라이언트의 연결을 수락
+        Getnameinfo((SA * ) & clientaddr, clientlen, hostname, MAXLINE, port, MAXLINE, 0); // 클라이언트의 호스트 이름과 포트 번호를 파악
+        printf("Accepted connection from (%s, %s)\n", hostname, port);
+        Pthread_create(&tid, NULL, thread, clientfd);
+    }
 }
 
 /* 각 연결을 처리할 스레드 함수 */
-void *thread_func(void *arg) {
-  int clientfd = *((int *)arg); // 클라이언트 소켓 파일 디스크립터를 인수로부터 얻음
-  free(arg);
-  // 기존의 `doit` 함수를 호출하여 클라이언트 요청 처리
-  doit(clientfd);
-
-  // 클라이언트 소켓 닫음
-  Close(clientfd);
-
-  // 스레드 종료
-  pthread_exit(NULL);
+void *thread(void *vargp) {
+    int clientfd = *((int *) vargp);
+    Pthread_detach(pthread_self());
+    Free(vargp);
+    doit(clientfd);
+    Close(clientfd);
+    return NULL;
 }
 
 /* 프록시 서버의 핵심 동작을 담당하는 함수 */
@@ -109,12 +100,21 @@ void doit(int clientfd) {
     }
     printf("%s\n", request_buf); // 전송할 요청 헤더 출력
     Rio_writen(serverfd, request_buf, strlen(request_buf)); // 서버에 요청 전송
+    Rio_readinitb(&response_rio, serverfd); // response_rio 버퍼 초기화
 
-    /* 서버로부터 응답 받아 클라이언트에 전송 */
     ssize_t n;
-    n = Rio_readn(serverfd, response_buf, MAX_OBJECT_SIZE); // 서버로부터 응답을 읽음
-    Rio_writen(clientfd, response_buf, n); // 클라이언트에게 응답을 전송
 
+     /* 응답 헤더 보내기 */ /* 동영상 재생 관련 오류 수정 */
+    while ((n = Rio_readlineb(&response_rio, response_buf, MAX_OBJECT_SIZE)) > 0) { // 서버로부터 OBJECT_SIZE 만큼 응답을 읽음
+      Rio_writen(clientfd, response_buf, n); // 클라이언트에게 응답을 전송
+      if (!strcmp(response_buf, "\r\n"))
+        break;
+    }
+
+    /* 응답 본문 보내기 */
+    while ((n = Rio_readlineb(&response_rio, response_buf, MAX_OBJECT_SIZE)) > 0) { // 서버로부터 OBJECT_SIZE 만큼 응답을 읽음
+      Rio_writen(clientfd, response_buf, n); // 클라이언트에게 응답을 전송
+    }
     Close(serverfd); // 서버 연결 종료
 }
 
