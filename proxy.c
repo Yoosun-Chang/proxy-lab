@@ -100,10 +100,11 @@ void doit(int clientfd) {
     }
     printf("%s\n", request_buf); // 전송할 요청 헤더 출력
     Rio_writen(serverfd, request_buf, strlen(request_buf)); // 서버에 요청 전송
-    Rio_readinitb(&response_rio, serverfd);
+    Rio_readinitb(&response_rio, serverfd); // response_rio 버퍼 초기화
 
     ssize_t n;
-  /* 응답 헤더 보내기 */
+
+     /* 응답 헤더 보내기 */ /* 동영상 재생 관련 오류 수정 */
     while ((n = Rio_readlineb(&response_rio, response_buf, MAX_OBJECT_SIZE)) > 0) { // 서버로부터 OBJECT_SIZE 만큼 응답을 읽음
       Rio_writen(clientfd, response_buf, n); // 클라이언트에게 응답을 전송
       if (!strcmp(response_buf, "\r\n"))
