@@ -17,25 +17,21 @@ static const char *user_agent_hdr =
     "Firefox/10.0.3\r\n";
 
 int main(int argc, char **argv) {
-  int listenfd;
-  int *clientfd; // 서버 및 클라이언트 소켓 파일 디스크립터
-  char hostname[MAXLINE], port[MAXLINE]; // 클라이언트 호스트네임 및 포트번호
-  socklen_t clientlen; // 클라이언트 주소 구조체 크기
-  struct sockaddr_storage clientaddr; // 클라이언트 주소 구조체
-  pthread_t tid; // 스레드 ID를 저장할 변수
+    int listenfd, *clientfd;
+    char hostname[MAXLINE], port[MAXLINE];
+    socklen_t clientlen;
+    struct sockaddr_storage clientaddr;
+    pthread_t tid;
 
-  // 명령행 인수 확인
-  if (argc != 2) { // 인수 개수가 2가 아니면 오류 메시지 출력
-    fprintf(stderr, "usage: %s <port>\n", argv[0]);
-    exit(1);
-  }
+    /* Check command line args */
+    if (argc != 2) {
+        fprintf(stderr, "usage: %s <port>\n", argv[0]);
+        exit(1);
+    }
 
-  signal(SIGPIPE, SIG_IGN); // broken pipe 에러 해결용 코드 -프로세스 전체에 대한 시그널 핸들러 설정
-
-  // 클라이언트 연결 수신 소켓 생성
-  listenfd = Open_listenfd(argv[1]);
-
-  // 클라이언트 요청 수락 및 처리
+    signal(SIGPIPE, SIG_IGN); // broken pipe 에러 해결용 코드 -프로세스 전체에 대한 시그널 핸들러 설정
+    
+    listenfd = Open_listenfd(argv[1]); // 지정된 포트에서 수신 소켓을 생성
     while (1) {
         clientlen = sizeof(clientaddr);
         clientfd = Malloc(sizeof(int));
@@ -57,36 +53,36 @@ void *thread(void *vargp) {
 }
 
 /* 프록시 서버의 핵심 동작을 담당하는 함수 */
-// 클라이언트로부터 요청을 받아들여 처리하고, 원격 서버에 전달하여 응답을 받아 클라이언트에게 다시 전송하는 함수
+// 클라이언트로부터 요청을 받아들여 처리하고, 원격 서버에 전달하여 응답을 받아 클라이언트에게 다시 전송
 void doit(int clientfd) {
-    int serverfd; // 서버 소켓 디스크립터
-    char request_buf[MAXLINE], response_buf[MAX_OBJECT_SIZE]; // 요청과 응답을 저장할 버퍼
-    char method[MAXLINE], uri[MAXLINE], path[MAXLINE]; // 요청 메소드, URI, 경로
-    char hostname[MAXLINE], port[MAXLINE]; // 호스트명, 포트
-    rio_t request_rio, response_rio; // 클라이언트로부터의 요청과 서버로부터의 응답을 처리하기 위한 리오 버퍼
+    int serverfd;
+    char request_buf[MAXLINE], response_buf[MAX_OBJECT_SIZE];
+    char method[MAXLINE], uri[MAXLINE], path[MAXLINE];
+    char hostname[MAXLINE], port[MAXLINE];
+    rio_t request_rio, response_rio;
 
     /* 클라이언트의 요청 읽기 */
     Rio_readinitb(&request_rio, clientfd); // 클라이언트 소켓 디스크립터를 리오 버퍼에 연결
     Rio_readlineb(&request_rio, request_buf, MAXLINE); // 클라이언트로부터 요청 라인을 읽음
-    printf("Request header: %s\n", request_buf); // 디버깅용 요청 헤더 출력
-
+    printf("Request header: %s\n", request_buf);
     /* 요청 메소드, URI 읽기 */
-    sscanf(request_buf, "%s %s", method, uri); // 요청 라인에서 메소드와 URI를 추출
-    
-    if (!strcasecmp(uri, "/favicon.ico")) // favicon 에러
-      return;
+    sscanf(request_buf, "%s %s", method, uri);
+
+    /* URI가 "/favicon.ico"인 경우에는 더 이상의 처리를 수행하지 않고 함수를 종료 */
+    if (!strcasecmp(uri, "/favicon.ico"))
+        return;
 
     /* URI 파싱하여 호스트명, 포트, 경로 추출 */
-    parse_uri(uri, hostname, port, path); // URI에서 호스트명, 포트, 경로를 파싱하여 변수에 저장
+    parse_uri(uri, hostname, port, path);
 
     printf("uri: %s\n", uri); // 디버깅용 URI 출력
 
-    /* 요청 수정: 새로운 요청 구성 */
-    sprintf(request_buf, "%s /%s %s\r\n", method, path, "HTTP/1.0"); // 요청 라인 재구성
-    printf("%s\n", request_buf); // 재구성된 요청 헤더 출력
-    sprintf(request_buf, "%sConnection: close\r\n", request_buf); // Connection 헤더 추가
-    sprintf(request_buf, "%sProxy-Connection: close\r\n", request_buf); // Proxy-Connection 헤더 추가
-    sprintf(request_buf, "%s%s\r\n", request_buf, user_agent_hdr); // User-Agent 헤더 추가
+    /* 새로운 요청 구성 */
+    sprintf(request_buf, "%s /%s %s\r\n", method, path, "HTTP/1.0");
+    printf("%s\n", request_buf);
+    sprintf(request_buf, "%sConnection: close\r\n", request_buf);
+    sprintf(request_buf, "%sProxy-Connection: close\r\n", request_buf);
+    sprintf(request_buf, "%s%s\r\n", request_buf, user_agent_hdr);
 
     /* 요청 메소드가 GET 또는 HEAD가 아닌 경우 오류 응답 전송 */
     if (strcasecmp(method, "GET") && strcasecmp(method, "HEAD")) {
@@ -97,26 +93,28 @@ void doit(int clientfd) {
     /* 원격 서버에 클라이언트의 요청 전송 */
     serverfd = Open_clientfd(hostname, port); // 서버로의 연결 생성
     if (serverfd < 0) { // 연결 실패 시
-        clienterror(clientfd, hostname, "404", "Not found", "Proxy couldn't connect to the server"); // 클라이언트에게 오류 응답 전송
+        clienterror(clientfd, hostname, "404", "Not found", "Proxy couldn't connect to the server");
         return;
     }
-    printf("%s\n", request_buf); // 전송할 요청 헤더 출력
-    Rio_writen(serverfd, request_buf, strlen(request_buf)); // 서버에 요청 전송
-    Rio_readinitb(&response_rio, serverfd); // response_rio 버퍼 초기화
 
+    printf("%s\n", request_buf);
+    rio_writen(serverfd, request_buf, strlen(request_buf)); // 서버에 요청 전송
+    Rio_readinitb(&response_rio, serverfd);
+
+    /* 서버로부터 응답 받아 클라이언트에 전송 */
     ssize_t n;
-
-     /* 응답 헤더 보내기 */ /* 동영상 재생 관련 오류 수정 */
-    while ((n = Rio_readlineb(&response_rio, response_buf, MAX_OBJECT_SIZE)) > 0) { // 서버로부터 OBJECT_SIZE 만큼 응답을 읽음
-      Rio_writen(clientfd, response_buf, n); // 클라이언트에게 응답을 전송
-      if (!strcmp(response_buf, "\r\n"))
-        break;
+    /* 응답 헤더 보내기 */
+    while ((n = Rio_readlineb(&response_rio, response_buf, MAX_OBJECT_SIZE)) > 0) {
+        rio_writen(clientfd, response_buf, n);
+        if (!strcmp(response_buf, "\r\n"))
+            break;
     }
 
     /* 응답 본문 보내기 */
-    while ((n = Rio_readlineb(&response_rio, response_buf, MAX_OBJECT_SIZE)) > 0) { // 서버로부터 OBJECT_SIZE 만큼 응답을 읽음
-      Rio_writen(clientfd, response_buf, n); // 클라이언트에게 응답을 전송
+    while ((n = Rio_readlineb(&response_rio, response_buf, MAX_OBJECT_SIZE)) > 0) {
+        rio_writen(clientfd, response_buf, n);
     }
+
     Close(serverfd); // 서버 연결 종료
 }
 
