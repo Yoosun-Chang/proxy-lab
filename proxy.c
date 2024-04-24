@@ -30,6 +30,8 @@ int main(int argc, char **argv) {
     exit(1);
   }
 
+  signal(SIGPIPE, SIG_IGN); // broken pipe 에러 해결용 코드 -프로세스 전체에 대한 시그널 핸들러 설정
+
   // 클라이언트 연결 수신 소켓 생성
   listenfd = Open_listenfd(argv[1]);
 
