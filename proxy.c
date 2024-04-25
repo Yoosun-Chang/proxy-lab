@@ -32,8 +32,10 @@ void read_requesthdrs(rio_t *rp);
 void *thread(void *vargp);
 void init_cache();
 cache_node *find_cache_node(cache *c, char *key);
+cache_node *create_cache_node(char *key, char *value, long size);
 void insert_cache_node(cache *c, char *key, char *value, long size);
 void delete_cache_node(cache *c, cache_node *node);
+
 
 /* You won't lose style points for including this long line in your code */
 static const char *user_agent_hdr =
@@ -86,6 +88,19 @@ void init_cache() {
     my_cache->root = NULL;
     my_cache->tail = NULL;
     my_cache->size = 0;
+}
+
+/* 새로운 캐시 노드 생성 */
+cache_node *create_cache_node(char *key, char *value, long size) {
+    cache_node *new_node = (cache_node *) malloc(sizeof(cache_node));
+    new_node->key = malloc(strlen(key) + 1);
+    strcpy(new_node->key, key);
+    new_node->value = malloc(size);
+    memcpy(new_node->value, value, size);
+    new_node->size = size;
+    new_node->prev = NULL;
+    new_node->next = NULL;
+    return new_node;
 }
 
 /* 주어진 키에 해당하는 캐시 노드 찾기 */
