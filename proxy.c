@@ -33,6 +33,7 @@ void *thread(void *vargp);
 void init_cache();
 cache_node *find_cache_node(cache *c, char *key);
 void insert_cache_node(cache *c, char *key, char *value, long size);
+void delete_cache_node(cache *c, cache_node *node);
 
 /* You won't lose style points for including this long line in your code */
 static const char *user_agent_hdr =
@@ -113,6 +114,24 @@ void insert_cache_node(cache *c, char *key, char *value, long size) {
         c->root = new_node;
     }
     c->size += size;
+}
+
+/* 캐시에서 노드 제거 */
+void delete_cache_node(cache *c, cache_node *node) {
+    if (node->prev != NULL) {
+        node->prev->next = node->next;
+    } else {
+        c->root = node->next;
+    }
+    if (node->next != NULL) {
+        node->next->prev = node->prev;
+    } else {
+        c->tail = node->prev;
+    }
+    c->size -= node->size;
+    free(node->key);
+    free(node->value);
+    free(node);
 }
 
 /* 프록시 서버의 핵심 동작을 담당하는 함수 */
