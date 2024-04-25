@@ -31,7 +31,8 @@ void clienterror(int fd, char *cause, char *errnum, char *shortmsg, char *longms
 void read_requesthdrs(rio_t *rp);
 void *thread(void *vargp);
 void init_cache();
-cache_node *find_cache_node(cache *c, char *key)
+cache_node *find_cache_node(cache *c, char *key);
+void insert_cache_node(cache *c, char *key, char *value, long size);
 
 /* You won't lose style points for including this long line in your code */
 static const char *user_agent_hdr =
@@ -98,6 +99,22 @@ cache_node *find_cache_node(cache *c, char *key) {
     return NULL;
 }
 
+/* 캐시에 새로운 노드 삽입 */
+void insert_cache_node(cache *c, char *key, char *value, long size) {
+    while (c->size + size > MAX_CACHE_SIZE) {
+        delete_cache_node(c, c->tail);
+    }
+    cache_node *new_node = create_cache_node(key, value, size);
+    if (c->root == NULL) {
+        c->root = new_node;
+    } else {
+        new_node->next = c->root;
+        c->root->prev = new_node;
+        c->root = new_node;
+    }
+    c->size += size;
+}
+
 /* 프록시 서버의 핵심 동작을 담당하는 함수 */
 // 클라이언트로부터 요청을 받아들여 처리하고, 원격 서버에 전달하여 응답을 받아 클라이언트에게 다시 전송
 void doit(int clientfd) {
@@ -126,11 +143,8 @@ void doit(int clientfd) {
         return;
     }
 
-
     /* URI 파싱하여 호스트명, 포트, 경로 추출 */
     parse_uri(uri, hostname, port, path);
-
-    printf("uri: %s\n", uri); // 디버깅용 URI 출력
 
     /* 새로운 요청 구성 */
     sprintf(request_buf, "%s /%s %s\r\n", method, path, "HTTP/1.0");
@@ -157,17 +171,13 @@ void doit(int clientfd) {
     Rio_readinitb(&response_rio, serverfd);
 
     /* 서버로부터 응답 받아 클라이언트에 전송 */
-    ssize_t n;
-    /* 응답 헤더 보내기 */
-    while ((n = Rio_readlineb(&response_rio, response_buf, MAX_OBJECT_SIZE)) > 0) {
-        rio_writen(clientfd, response_buf, n);
-        if (!strcmp(response_buf, "\r\n"))
-            break;
-    }
+    // 서버로부터 응답 읽기
+    ssize_t response_size = Rio_readnb(&response_rio, response_buf, MAX_OBJECT_SIZE);
+    Rio_writen(clientfd, response_buf, response_size);
 
-    /* 응답 본문 보내기 */
-    while ((n = Rio_readlineb(&response_rio, response_buf, MAX_OBJECT_SIZE)) > 0) {
-        rio_writen(clientfd, response_buf, n);
+    // 응답 크기가 최대 객체 크기보다 작으면 캐시에 저장
+    if (strlen(response_buf) < MAX_OBJECT_SIZE) {
+        insert_cache_node(my_cache, uri, response_buf, response_size);
     }
 
     Close(serverfd); // 서버 연결 종료
