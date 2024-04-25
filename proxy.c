@@ -30,6 +30,7 @@ void parse_uri(char *uri, char *hostname, char *pathname, char *port);
 void clienterror(int fd, char *cause, char *errnum, char *shortmsg, char *longmsg);
 void read_requesthdrs(rio_t *rp);
 void *thread(void *vargp);
+void init_cache();
 
 /* You won't lose style points for including this long line in your code */
 static const char *user_agent_hdr =
@@ -54,6 +55,8 @@ int main(int argc, char **argv) {
     signal(SIGPIPE, SIG_IGN); // broken pipe 에러 해결용 코드 -프로세스 전체에 대한 시그널 핸들러 설정
     
     listenfd = Open_listenfd(argv[1]); // 지정된 포트에서 수신 소켓을 생성
+    init_cache();
+
     while (1) {
         clientlen = sizeof(clientaddr);
         clientfd = Malloc(sizeof(int));
@@ -72,6 +75,14 @@ void *thread(void *vargp) {
     doit(clientfd);
     Close(clientfd);
     return NULL;
+}
+
+/* 캐시 초기화 */
+void init_cache() {
+    my_cache = (cache *) malloc(sizeof(cache));
+    my_cache->root = NULL;
+    my_cache->tail = NULL;
+    my_cache->size = 0;
 }
 
 /* 프록시 서버의 핵심 동작을 담당하는 함수 */
