@@ -9,6 +9,22 @@
 #define MAX_CACHE_SIZE 1049000 // 최대 캐시 크기
 #define MAX_OBJECT_SIZE 102400 // 최대 객체 크기
 
+/* 캐시 노드 */
+typedef struct node {
+    char *key;              // URI 키
+    unsigned char *value;   // 응답 본문
+    struct node *prev;      // 캐시 내 이전 노드를 가리키는 포인터
+    struct node *next;      // 캐시 내 다음 노드를 가리키는 포인터
+    long size;              // 응답 본문의 크기
+} cache_node;
+
+/* 캐시 리스트 (이중 연결 리스트) */
+typedef struct cache {
+    cache_node *root;   // 캐시 내 첫 번째 노드를 가리키는 포인터
+    cache_node *tail;   // 캐시 내 마지막 노드를 가리키는 포인터
+    int size;           // 현재 캐시의 크기
+} cache;
+
 void doit(int fd);
 void parse_uri(char *uri, char *hostname, char *pathname, char *port);
 void clienterror(int fd, char *cause, char *errnum, char *shortmsg, char *longmsg);
@@ -19,6 +35,8 @@ void *thread(void *vargp);
 static const char *user_agent_hdr =
     "User-Agent: Mozilla/5.0 (X11; Linux x86_64; rv:10.0.3) Gecko/20120305 "
     "Firefox/10.0.3\r\n";
+
+static cache *my_cache;
 
 int main(int argc, char **argv) {
     int listenfd, *clientfd;
