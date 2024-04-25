@@ -31,6 +31,7 @@ void clienterror(int fd, char *cause, char *errnum, char *shortmsg, char *longms
 void read_requesthdrs(rio_t *rp);
 void *thread(void *vargp);
 void init_cache();
+cache_node *find_cache_node(cache *c, char *key)
 
 /* You won't lose style points for including this long line in your code */
 static const char *user_agent_hdr =
@@ -85,6 +86,18 @@ void init_cache() {
     my_cache->size = 0;
 }
 
+/* 주어진 키에 해당하는 캐시 노드 찾기 */
+cache_node *find_cache_node(cache *c, char *key) {
+    cache_node *current = c->root;
+    while (current != NULL) {
+        if (strcasecmp(current->key, key) == 0) {
+            return current;
+        }
+        current = current->next;
+    }
+    return NULL;
+}
+
 /* 프록시 서버의 핵심 동작을 담당하는 함수 */
 // 클라이언트로부터 요청을 받아들여 처리하고, 원격 서버에 전달하여 응답을 받아 클라이언트에게 다시 전송
 void doit(int clientfd) {
@@ -104,6 +117,15 @@ void doit(int clientfd) {
     /* URI가 "/favicon.ico"인 경우에는 더 이상의 처리를 수행하지 않고 함수를 종료 */
     if (!strcasecmp(uri, "/favicon.ico"))
         return;
+    
+    cache_node *cached_node = find_cache_node(my_cache, uri);
+
+    // 캐시에 응답이 있는 경우, 데이터 반환
+    if (cached_node != NULL) {
+        Rio_writen(clientfd, cached_node->value, cached_node->size);
+        return;
+    }
+
 
     /* URI 파싱하여 호스트명, 포트, 경로 추출 */
     parse_uri(uri, hostname, port, path);
